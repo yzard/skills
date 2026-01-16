@@ -77,21 +77,60 @@ for index, entry in enumerate(time_entries):
 
 | Abbreviation | Meaning |
 |--------------|---------|
-| `tcp`, `udp`, `http`, `https` | Network protocols |
-| `url`, `uri` | Web addresses |
-| `html`, `css`, `json`, `xml`, `yaml` | Data/markup formats |
-| `api` | Application Programming Interface |
-| `id` | Identifier |
-| `sql` | Structured Query Language |
-| `ip` | Internet Protocol |
-| `cpu`, `gpu`, `ram` | Hardware components |
-| `pdf` | Portable Document Format |
-| `uuid` | Universally Unique Identifier |
-| `jwt` | JSON Web Token |
-| `oauth` | Open Authorization |
-| `ssl`, `tls` | Security protocols |
-| `io` | Input/Output |
-| `async` | Asynchronous |
+| tcp, udp, http, https | Network protocols |
+| url, uri | Web addresses |
+| html, css, json, xml, yaml | Data/markup formats |
+| api | Application Programming Interface |
+| id | Identifier |
+| sql | Structured Query Language |
+| ip | Internet Protocol |
+| cpu, gpu, ram | Hardware components |
+| pdf | Portable Document Format |
+| uuid | Universally Unique Identifier |
+| jwt | JSON Web Token |
+| oauth | Open Authorization |
+| ssl, tls | Security protocols |
+| io | Input/Output |
+| ymq, zmq | Message queue protocols |
+
+**Abbreviation casing depends on the naming convention:**
+
+- **PascalCase (classes):** Abbreviations stay UPPERCASE
+- **snake_case (functions/variables):** Abbreviations are lowercase
+- **camelCase (JavaScript):** Abbreviations stay UPPERCASE
+
+```python
+# Python - PascalCase classes: abbreviations UPPERCASE
+class TCPConnection:       # TCP uppercase
+class YMQSubscriber:       # YMQ uppercase
+class HTTPClient:          # HTTP uppercase
+
+# Python - snake_case functions/variables: abbreviations lowercase
+def send_http_request():   # http lowercase
+def process_ymq_message(): # ymq lowercase
+max_tcp_connections = 10   # tcp lowercase
+api_url = "https://..."    # url lowercase
+
+# WRONG
+class TcpConnection:       # TCP should be uppercase in PascalCase
+def send_HTTP_request():   # http should be lowercase in snake_case
+max_TCP_connections = 10   # tcp should be lowercase in snake_case
+```
+
+```javascript
+// JavaScript - PascalCase classes: abbreviations UPPERCASE
+class TCPConnection {}     // TCP uppercase
+class YMQSubscriber {}     // YMQ uppercase
+
+// JavaScript - camelCase functions/variables: abbreviations UPPERCASE
+function sendHTTPRequest() {}  // HTTP uppercase
+const maxTCPConnections = 10;  // TCP uppercase
+const apiURL = "https://...";  // URL uppercase
+
+// WRONG
+class TcpConnection {}         // TCP should be uppercase
+function sendHttpRequest() {}  // HTTP should be uppercase
+```
 
 ### 3. Cross-Layer Consistency (CRITICAL)
 
