@@ -144,7 +144,7 @@ cout << "Hello" << endl;
 
 ### Explicit Includes - No Transitive Dependencies
 
-Always include headers that define the symbols you use, even if they're already transitively included.
+Always include headers that directly define the symbols you use, even if they're already transitively included.
 
 ```cpp
 // GOOD - explicit includes
@@ -159,6 +159,18 @@ Always include headers that define the symbols you use, even if they're already 
 ### Remove Unused Includes
 
 Delete includes when none of their symbols are used in the file.
+
+### Direct Includes Over Indirect Includes
+
+When a symbol is declared in a specific header, include that header directly. Do not include a different header just because it includes the needed one.
+
+```cpp
+// GOOD - include the declaring header directly
+#include "a.h"  // declares foobar()
+
+// BAD - indirect include via another header
+#include "b.h"  // includes a.h, but foobar() is declared in a.h
+```
 
 ## Struct vs Class
 

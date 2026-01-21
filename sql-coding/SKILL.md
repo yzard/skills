@@ -9,6 +9,8 @@ allowed-tools: Read, Edit, Write, Glob, Grep
 ## What This Skill Does
 
 Guides writing SQL queries following strict formatting conventions:
+- Centralized `schema.sql` for database schema management
+- Centralized query file with named constants (no inline SQL)
 - Raw SQL only (no ORM)
 - Cross-database compatibility
 - Consistent formatting with leading commas
@@ -16,7 +18,193 @@ Guides writing SQL queries following strict formatting conventions:
 
 ## Core Principles
 
-### 1. No ORM - Use Raw SQL
+### 1. Centralized Schema File
+
+**Every project MUST have a centralized `schema.sql` file** that defines the complete database schema. This file ensures:
+- New databases are created with all necessary tables and columns
+- Existing databases can be migrated to include any missing tables/columns
+
+```sql
+-- schema.sql - Single source of truth for database schema
+-- Run on startup to ensure all tables exist
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  role TEXT DEFAULT 'user',
+  is_active INTEGER DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  total_amount REAL NOT NULL,
+  status TEXT DEFAULT 'pending',
+  order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders (user_id);
+```
+
+**Best Practices:**
+- Use `CREATE TABLE IF NOT EXISTS` for all tables
+- Use `CREATE INDEX IF NOT EXISTS` for all indexes
+- Include foreign key constraints
+- Keep schema.sql as the single source of truth
+- Run schema.sql on application startup
+
+### 2. Centralized Query File
+
+**All SQL queries MUST be defined in a centralized query file** with named variables. Other source files import and reference these variables instead of writing inline SQL.
+
+**Python Example (`queries.py`):**
+```python
+# queries.py - All SQL queries defined as named constants
+
+# User queries
+GET_USER_BY_ID = """
+SELECT id
+     , name
+     , email
+     , created_at
+  FROM users
+ WHERE id = ?
+"""
+
+GET_ACTIVE_USERS = """
+SELECT id
+     , name
+     , email
+  FROM users
+ WHERE is_active = 1
+ ORDER BY name
+"""
+
+CREATE_USER = """
+INSERT INTO users (name, email, role)
+VALUES (?, ?, ?)
+"""
+
+UPDATE_USER = """
+UPDATE users
+   SET name = ?
+     , email = ?
+     , updated_at = CURRENT_TIMESTAMP
+ WHERE id = ?
+"""
+
+# Order queries
+GET_USER_ORDERS = """
+SELECT o.id
+     , o.total_amount
+     , o.status
+     , o.order_date
+  FROM orders AS o
+ WHERE o.user_id = ?
+ ORDER BY o.order_date DESC
+"""
+
+GET_ORDER_SUMMARY = """
+SELECT u.id
+     , u.name
+     , COUNT(o.id) AS order_count
+     , SUM(o.total_amount) AS total_spent
+  FROM users AS u
+  LEFT JOIN orders AS o ON u.id = o.user_id
+ GROUP BY u.id
+        , u.name
+"""
+```
+
+**Using queries in other files:**
+```python
+# user_service.py
+from queries import GET_USER_BY_ID, CREATE_USER, GET_ACTIVE_USERS
+
+class UserService:
+    def get_user(self, user_id: str):
+        cursor = self.connection.cursor()
+        cursor.execute(GET_USER_BY_ID, (user_id,))
+        return cursor.fetchone()
+
+    def get_active_users(self):
+        cursor = self.connection.cursor()
+        cursor.execute(GET_ACTIVE_USERS)
+        return cursor.fetchall()
+```
+
+**Rust Example (`queries.rs`):**
+```rust
+// queries.rs - All SQL queries defined as constants
+
+// User queries
+pub const GET_USER_BY_ID: &str = r#"
+SELECT id
+     , name
+     , email
+     , created_at
+  FROM users
+ WHERE id = ?
+"#;
+
+pub const GET_ACTIVE_USERS: &str = r#"
+SELECT id
+     , name
+     , email
+  FROM users
+ WHERE is_active = 1
+ ORDER BY name
+"#;
+
+pub const CREATE_USER: &str = r#"
+INSERT INTO users (name, email, role)
+VALUES (?, ?, ?)
+"#;
+```
+
+**TypeScript/JavaScript Example (`queries.ts`):**
+```typescript
+// queries.ts - All SQL queries defined as constants
+
+// User queries
+export const GET_USER_BY_ID = `
+SELECT id
+     , name
+     , email
+     , created_at
+  FROM users
+ WHERE id = ?
+`;
+
+export const GET_ACTIVE_USERS = `
+SELECT id
+     , name
+     , email
+  FROM users
+ WHERE is_active = 1
+ ORDER BY name
+`;
+
+export const CREATE_USER = `
+INSERT INTO users (name, email, role)
+VALUES (?, ?, ?)
+`;
+```
+
+**Benefits:**
+- Single location to find and update all queries
+- Easier to review SQL for security and performance
+- Prevents query duplication
+- Enables query reuse across services
+- Simplifies testing and mocking
+
+### 3. No ORM - Use Raw SQL
 
 **DO NOT use SQLAlchemy or any ORM.** Write raw SQL for maximum control and portability.
 
@@ -36,7 +224,7 @@ from sqlalchemy.orm import Session
 session.query(User).filter(User.id == user_id).first()
 ```
 
-### 2. Parameterized Queries
+### 5. Parameterized Queries
 
 **ALWAYS use `?` placeholders** to prevent SQL injection.
 
@@ -55,7 +243,7 @@ cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
 cursor.execute("SELECT * FROM users WHERE id = " + user_id)
 ```
 
-### 3. Database Compatibility
+### 6. Database Compatibility
 
 Write SQL compatible across **SQLite**, **PostgreSQL**, and **DuckDB**.
 
@@ -261,14 +449,14 @@ SELECT au.id
 ### INSERT
 
 ```sql
-INSERT INTO users (
-    name
+INSERT INTO users
+  ( name
   , email
   , role
   , is_active
   , created_at
-) VALUES (
-    ?
+) VALUES
+  ( ?
   , ?
   , ?
   , 1
@@ -298,13 +486,13 @@ DELETE FROM users
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT
-  , name TEXT NOT NULL
-  , email TEXT NOT NULL UNIQUE
-  , role TEXT DEFAULT 'user'
-  , is_active INTEGER DEFAULT 1
-  , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  , updated_at TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  role TEXT DEFAULT 'user',
+  is_active INTEGER DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP
 )
 ```
 
@@ -413,13 +601,16 @@ sql = "SELECT u.id, u.name, o.order_count FROM users AS u LEFT JOIN order_summar
 
 When writing SQL:
 
-1. [ ] Keywords in UPPERCASE
-2. [ ] Table/column names in lowercase
-3. [ ] Leading commas for columns
-4. [ ] Each column on its own line
-5. [ ] Parameterized queries with `?`
-6. [ ] Aligned keywords (SELECT, FROM, WHERE)
-7. [ ] JOINs on separate lines with aligned ON
-8. [ ] GROUP BY / HAVING properly indented
-9. [ ] No ORM usage
-10. [ ] Compatible across SQLite/PostgreSQL/DuckDB
+1. [ ] Centralized `schema.sql` exists with all tables/indexes
+2. [ ] All queries defined in centralized query file (e.g., `queries.py`, `queries.rs`, `queries.ts`)
+3. [ ] Source files import query constants instead of inline SQL
+4. [ ] Keywords in UPPERCASE
+5. [ ] Table/column names in lowercase
+6. [ ] Leading commas for columns
+7. [ ] Each column on its own line
+8. [ ] Parameterized queries with `?`
+9. [ ] Aligned keywords (SELECT, FROM, WHERE)
+10. [ ] JOINs on separate lines with aligned ON
+11. [ ] GROUP BY / HAVING properly indented
+12. [ ] No ORM usage
+13. [ ] Compatible across SQLite/PostgreSQL/DuckDB
