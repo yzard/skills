@@ -28,6 +28,7 @@ server/
 ├── auth.py              # Authentication logic
 ├── database.py          # Database queries (or database/ module)
 ├── exceptions.py        # Custom exceptions and global handler
+├── middleware.py        # Request logging middleware
 └── module/              # Optional sub-modules
     ├── __init__.py
     └── routes.py        # Sub-module endpoints
@@ -287,6 +288,102 @@ def setup_exception_handlers(app: FastAPI) -> None:
     """Register exception handlers on the app."""
     app.add_exception_handler(AppException, app_exception_handler)
     app.add_exception_handler(Exception, global_exception_handler)
+```
+
+## server/middleware.py - Request Logging Middleware
+
+**Log every request with method, path, status, duration, and request body.**
+
+Format: `INFO POST /api/v1/media/list 200 03.98ms {"cursor":"2025-03-12T22:13:36+00:00_128","groupBy":"day","limit":100}`
+
+```python
+import json
+import logging
+import time
+from typing import Callable
+
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+logger = logging.getLogger(__name__)
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log every request with method, path, status, duration, and body."""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        start_time = time.perf_counter()
+
+        # Read request body for logging
+        body_bytes = await request.body()
+        body_str = ""
+        if body_bytes:
+            try:
+                body_json = json.loads(body_bytes)
+                body_str = json.dumps(body_json, separators=(",", ":"))
+            except json.JSONDecodeError:
+                body_str = body_bytes.decode("utf-8", errors="replace")
+
+        # Process request
+        response = await call_next(request)
+
+        # Calculate duration
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        # Format log line: INFO POST /api/v1/media/list 200 03.98ms {"key":"value"}
+        method = request.method
+        path = request.url.path
+        status = response.status_code
+
+        if body_str:
+            log_line = f"{method} {path} {status} {duration_ms:05.2f}ms {body_str}"
+        else:
+            log_line = f"{method} {path} {status} {duration_ms:05.2f}ms"
+
+        # Log with appropriate level based on status code
+        if status >= 500:
+            logger.error(log_line)
+        elif status >= 400:
+            logger.warning(log_line)
+        else:
+            logger.info(log_line)
+
+        return response
+
+
+def setup_middleware(app) -> None:
+    """Register middleware on the app."""
+    app.add_middleware(RequestLoggingMiddleware)
+```
+
+**Update app.py to include middleware:**
+
+```python
+from server.middleware import setup_middleware
+
+def create_application(config: ServerConfig) -> FastAPI:
+    app = FastAPI(title="API Server", lifespan=lifespan)
+    app.state.config = config
+    app.state.sessions = {}
+
+    # Setup middleware (order matters - logging should be outermost)
+    setup_middleware(app)
+
+    # Setup global exception handler
+    setup_exception_handlers(app)
+
+    # Include routers
+    app.include_router(router, prefix="/api")
+
+    return app
+```
+
+**Example log output:**
+```
+INFO POST /api/v1/media/list 200 03.98ms {"cursor":"2025-03-12T22:13:36+00:00_128","groupBy":"day","limit":100}
+WARN POST /api/v1/items/get 404 01.23ms {"item_id":"nonexistent"}
+ERROR POST /api/v1/items/create 500 15.67ms {"name":"test"}
 ```
 
 ## Exception Handling Pattern
@@ -718,8 +815,24 @@ def perform_action(
 | **POST for all endpoints** | Except FileResponse, streaming |
 | **Pydantic request models** | All POST data validated |
 | **No try-except in endpoints** | Global handler catches all |
-| **Log request + traceback** | On unhandled exceptions |
+| **Log every request** | Format: `INFO POST /path 200 03.98ms {body}` |
 | **Session-based auth** | HTTP Basic → token → X-Auth-Token header |
+
+## Request Logging Format
+
+Every request is logged with:
+- Log level (INFO/WARN/ERROR based on status code)
+- HTTP method
+- Request path
+- Response status code
+- Duration in milliseconds (05.2 format)
+- Request body as compact JSON
+
+```
+INFO POST /api/v1/media/list 200 03.98ms {"cursor":"2025-03-12T22:13:36+00:00_128","groupBy":"day","limit":100}
+WARN POST /api/v1/items/get 404 01.23ms {"item_id":"nonexistent"}
+ERROR POST /api/v1/items/create 500 15.67ms {"name":"test"}
+```
 
 ## Endpoint Pattern
 

@@ -9,57 +9,145 @@ allowed-tools: Read, Edit, Write, Glob, Grep
 ## What This Skill Does
 
 Guides writing SQL queries following strict formatting conventions:
-- Centralized `schema.sql` for database schema management
+- Single `schema.sql` file for ALL table and index creation statements
+- Single migration file per migration (never scatter migration SQL)
 - Centralized query file with named constants (no inline SQL)
 - Raw SQL only (no ORM)
 - Cross-database compatibility
-- Consistent formatting with leading commas
+- Trailing commas in CREATE TABLE column definitions
+- Leading commas in SELECT column lists
 - Parameterized queries for security
+- SQL code centralized, never scattered across source files
 
 ## Core Principles
 
-### 1. Centralized Schema File
+### 1. Single Centralized Schema File
 
-**Every project MUST have a centralized `schema.sql` file** that defines the complete database schema. This file ensures:
+**Every project MUST have ONE `schema.sql` file** that contains ALL:
+- Table creation statements
+- Index creation statements
+- Foreign key constraints
+
+**NEVER scatter SQL DDL across multiple files.** All table and index definitions belong in `schema.sql`.
+
+This file ensures:
 - New databases are created with all necessary tables and columns
 - Existing databases can be migrated to include any missing tables/columns
+- Single source of truth for the entire database structure
 
 ```sql
 -- schema.sql - Single source of truth for database schema
+-- Contains ALL tables and ALL indexes
 -- Run on startup to ensure all tables exist
 
 CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  role TEXT DEFAULT 'user',
-  is_active INTEGER DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT DEFAULT 'user',
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS orders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
-  total_amount REAL NOT NULL,
-  status TEXT DEFAULT 'pending',
-  order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    total_amount REAL NOT NULL,
+    status TEXT DEFAULT 'pending',
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Indexes
+-- ALL indexes must also be in this file
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders (user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+```
+
+**Column Definition Format (CREATE TABLE):**
+- Trailing commas: comma goes on the RIGHT of each column definition
+- Each column on its own line with consistent indentation
+- Last column or constraint has NO trailing comma
+
+```sql
+-- GOOD - Trailing commas (comma on right)
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- BAD - Leading commas in CREATE TABLE
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT
+  , name TEXT NOT NULL
+  , email TEXT NOT NULL UNIQUE
+  , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 **Best Practices:**
 - Use `CREATE TABLE IF NOT EXISTS` for all tables
 - Use `CREATE INDEX IF NOT EXISTS` for all indexes
 - Include foreign key constraints
-- Keep schema.sql as the single source of truth
+- Keep schema.sql as the ONLY file for DDL statements
 - Run schema.sql on application startup
+- NEVER put table/index creation in source code files
 
-### 2. Centralized Query File
+### 2. Migration Files
+
+**When database schema changes require migration, use ONE file per migration.** Never scatter migration SQL across multiple source files.
+
+**Migration File Structure:**
+```
+migrations/
+├── 001_initial_schema.sql
+├── 002_add_user_preferences.sql
+├── 003_add_order_tracking.sql
+└── 004_add_product_categories.sql
+```
+
+**Each migration file contains ALL SQL for that migration:**
+
+```sql
+-- migrations/002_add_user_preferences.sql
+-- Migration: Add user preferences table and related columns
+-- Date: 2024-01-15
+
+-- Add new table
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    theme TEXT DEFAULT 'light',
+    language TEXT DEFAULT 'en',
+    notifications_enabled INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Add new columns to existing table
+ALTER TABLE users ADD COLUMN preferences_id INTEGER;
+
+-- Add indexes for new table
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences (user_id);
+```
+
+**Migration Best Practices:**
+- One migration file = one logical change
+- Include all related DDL in the same file (tables, columns, indexes)
+- Use sequential numbering (001_, 002_, etc.)
+- Include descriptive filename and header comment
+- NEVER put migration SQL in application source code
+- NEVER scatter a single migration across multiple files
+- Keep migrations idempotent where possible (`IF NOT EXISTS`, `IF EXISTS`)
+
+**Update schema.sql after migration:**
+After a migration is applied, update `schema.sql` to reflect the new complete schema. The `schema.sql` should always represent the current database structure.
+
+### 3. Centralized Query File
 
 **All SQL queries MUST be defined in a centralized query file** with named variables. Other source files import and reference these variables instead of writing inline SQL.
 
@@ -204,7 +292,41 @@ VALUES (?, ?, ?)
 - Enables query reuse across services
 - Simplifies testing and mocking
 
-### 3. No ORM - Use Raw SQL
+### 4. No Scattered SQL
+
+**NEVER scatter SQL across multiple source files.** All SQL must be centralized:
+
+| SQL Type | Location | Example |
+|----------|----------|---------|
+| Table creation | `schema.sql` | `CREATE TABLE IF NOT EXISTS...` |
+| Index creation | `schema.sql` | `CREATE INDEX IF NOT EXISTS...` |
+| Migrations | `migrations/NNN_description.sql` | One file per migration |
+| Queries | `queries.py`, `queries.rs`, `queries.ts` | Named constants |
+
+**BAD - SQL scattered across files:**
+```
+src/
+├── user_service.py      # Contains CREATE TABLE for users
+├── order_service.py     # Contains CREATE TABLE for orders
+├── analytics.py         # Contains inline queries
+└── migrations/
+    ├── add_users.py     # SQL mixed with Python
+    └── add_orders.py    # SQL mixed with Python
+```
+
+**GOOD - SQL centralized:**
+```
+src/
+├── schema.sql           # ALL table and index creation
+├── queries.py           # ALL query constants
+├── migrations/
+│   ├── 001_initial.sql  # Complete migration in one file
+│   └── 002_add_prefs.sql
+├── user_service.py      # Imports from queries.py
+└── order_service.py     # Imports from queries.py
+```
+
+### 6. No ORM - Use Raw SQL
 
 **DO NOT use SQLAlchemy or any ORM.** Write raw SQL for maximum control and portability.
 
@@ -224,7 +346,7 @@ from sqlalchemy.orm import Session
 session.query(User).filter(User.id == user_id).first()
 ```
 
-### 5. Parameterized Queries
+### 7. Parameterized Queries
 
 **ALWAYS use `?` placeholders** to prevent SQL injection.
 
@@ -243,7 +365,7 @@ cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
 cursor.execute("SELECT * FROM users WHERE id = " + user_id)
 ```
 
-### 6. Database Compatibility
+### 8. Database Compatibility
 
 Write SQL compatible across **SQLite**, **PostgreSQL**, and **DuckDB**.
 
@@ -288,19 +410,28 @@ SELECT User_ID, UserName, Created_At
  WHERE Is_Active = 1
 ```
 
-### Leading Commas
+### Comma Placement Rules
 
-Use **leading commas** (comma at beginning of line):
+**Different rules for different statements:**
+
+| Statement Type | Comma Position | Example |
+|----------------|----------------|---------|
+| SELECT, INSERT, UPDATE | Leading (left) | `, column_name` |
+| CREATE TABLE | Trailing (right) | `column_name,` |
+
+#### SELECT/DML: Leading Commas
+
+Use **leading commas** (comma at beginning of line) for SELECT, INSERT column lists, UPDATE SET clauses:
 
 ```sql
--- GOOD - Leading commas
+-- GOOD - Leading commas in SELECT
 SELECT id
      , name
      , email
      , created_at
   FROM users
 
--- BAD - Trailing commas
+-- BAD - Trailing commas in SELECT
 SELECT id,
        name,
        email,
@@ -308,10 +439,32 @@ SELECT id,
   FROM users
 ```
 
-**Why leading commas?**
+**Why leading commas for SELECT?**
 - Easier to add/remove columns
 - Easier to spot missing commas
 - Cleaner diffs in version control
+
+#### CREATE TABLE: Trailing Commas
+
+Use **trailing commas** (comma at end of line) for CREATE TABLE column definitions:
+
+```sql
+-- GOOD - Trailing commas in CREATE TABLE
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- BAD - Leading commas in CREATE TABLE
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT
+  , name TEXT NOT NULL
+  , email TEXT NOT NULL UNIQUE
+  , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ### Column Alignment
 
@@ -484,16 +637,18 @@ DELETE FROM users
 
 ### CREATE TABLE
 
+Use trailing commas (comma on right of each column definition):
+
 ```sql
 CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  role TEXT DEFAULT 'user',
-  is_active INTEGER DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP
-)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT DEFAULT 'user',
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
+);
 ```
 
 ### CREATE INDEX
@@ -601,16 +756,24 @@ sql = "SELECT u.id, u.name, o.order_count FROM users AS u LEFT JOIN order_summar
 
 When writing SQL:
 
-1. [ ] Centralized `schema.sql` exists with all tables/indexes
-2. [ ] All queries defined in centralized query file (e.g., `queries.py`, `queries.rs`, `queries.ts`)
-3. [ ] Source files import query constants instead of inline SQL
-4. [ ] Keywords in UPPERCASE
-5. [ ] Table/column names in lowercase
-6. [ ] Leading commas for columns
-7. [ ] Each column on its own line
-8. [ ] Parameterized queries with `?`
-9. [ ] Aligned keywords (SELECT, FROM, WHERE)
-10. [ ] JOINs on separate lines with aligned ON
-11. [ ] GROUP BY / HAVING properly indented
-12. [ ] No ORM usage
-13. [ ] Compatible across SQLite/PostgreSQL/DuckDB
+**File Organization:**
+1. [ ] Single `schema.sql` file contains ALL table and index creation statements
+2. [ ] Migrations use ONE file per migration (never scatter migration SQL)
+3. [ ] All queries defined in centralized query file (e.g., `queries.py`, `queries.rs`, `queries.ts`)
+4. [ ] Source files import query constants instead of inline SQL
+5. [ ] NO SQL DDL scattered across application source files
+
+**Formatting:**
+6. [ ] Keywords in UPPERCASE
+7. [ ] Table/column names in lowercase
+8. [ ] CREATE TABLE uses trailing commas (comma on right of column definition)
+9. [ ] SELECT uses leading commas (comma on left of column)
+10. [ ] Each column on its own line
+11. [ ] Parameterized queries with `?`
+12. [ ] Aligned keywords (SELECT, FROM, WHERE)
+13. [ ] JOINs on separate lines with aligned ON
+14. [ ] GROUP BY / HAVING properly indented
+
+**Other:**
+15. [ ] No ORM usage
+16. [ ] Compatible across SQLite/PostgreSQL/DuckDB
