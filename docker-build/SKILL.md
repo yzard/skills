@@ -1,6 +1,6 @@
 ---
 name: docker-build
-description: Create Docker build scripts for Python and/or Rust projects. Use when the user asks to create a build.sh script, dockerize an application, set up Docker builds, or add a Rust binary alongside a Python app.
+description: Create Docker build infrastructure for Python and/or Rust projects - Dockerfile, entrypoint.sh, and a build_docker.sh script. Use when the user asks to create a build script, dockerize an application, set up Docker builds, or add a Rust binary alongside a Python app.
 allowed-tools: Write, Read, Bash, Glob, Grep
 ---
 
@@ -9,9 +9,31 @@ allowed-tools: Write, Read, Bash, Glob, Grep
 ## What This Skill Does
 
 Creates Docker build infrastructure for Python and/or Rust projects:
-- `build.sh` - Build script with date-based tagging
+- `build_docker.sh` - Build script with date-based tagging, at the git root
 - `Dockerfile` - Alpine-based multi-stage image; supports Python (uv), Rust, or both
 - `entrypoint.sh` - Supports PUID/PGID/UMASK/TZ for proper permissions
+
+This skill owns the **contents** of those files. Their **locations** are owned by the
+`project-structure` skill, Rule 6 — summarized below, with the path consequences
+(build context, `.dockerignore` naming, compose paths) documented there.
+
+## File Locations
+
+All Docker files live in `<git root>/docker/`. The single exception is
+`build_docker.sh`, which sits at the git root and cds into `docker/` to build.
+
+```
+<git root>/
+├── build_docker.sh              # the only Docker-related file at the root
+└── docker/
+    ├── Dockerfile
+    ├── Dockerfile.dockerignore  # NOT .dockerignore — see project-structure Rule 6
+    ├── docker-compose.yml
+    └── entrypoint.sh
+```
+
+The build context is the **git root**, not `docker/`, so the Dockerfile can copy
+`src/`. Every `COPY` path in the templates below is relative to the git root.
 
 ## Before Creating
 
@@ -30,15 +52,19 @@ find . -name "main.py" -o -name "app.py" -o -name "server.py"
 # Find Rust crates
 find . -name "Cargo.toml" -maxdepth 3
 # Check existing files
-ls -la Dockerfile requirements.txt pyproject.toml Cargo.toml 2>/dev/null
+ls -la docker/ build_docker.sh requirements.txt pyproject.toml Cargo.toml 2>/dev/null
 ```
 
-## build.sh Template
+## build_docker.sh Template
 
-Create `build.sh` in project root:
+Create `build_docker.sh` at the **git root**:
 
 ```bash
 #!/bin/bash
+set -euo pipefail
+
+# Enter docker/ so the script works from any working directory
+cd "$(dirname "$0")/docker"
 
 # Get current date in YYYYMMDD format
 TAG=$(date +%Y%m%d)
@@ -46,7 +72,8 @@ IMAGE_NAME="<username>/<project-name>"
 
 echo "Building Docker image: ${IMAGE_NAME}:${TAG}..."
 
-docker build -t "${IMAGE_NAME}:${TAG}" -t "${IMAGE_NAME}:latest" .
+# -f Dockerfile with `..` as context: the build context is the git root
+docker build -f Dockerfile -t "${IMAGE_NAME}:${TAG}" -t "${IMAGE_NAME}:latest" ..
 
 echo "Build complete: ${IMAGE_NAME}:${TAG}"
 
@@ -59,7 +86,7 @@ echo "Push complete: ${IMAGE_NAME}:${TAG} and ${IMAGE_NAME}:latest"
 
 ## entrypoint.sh Template
 
-Create `entrypoint.sh` in project root. This script:
+Create `docker/entrypoint.sh`. This script:
 - Creates user/group with specified PUID/PGID
 - Sets UMASK for file permissions
 - Sets timezone via TZ
@@ -104,7 +131,7 @@ exec su-exec abc:abc sh -c "umask '$UMASK' && exec python -m <package>.main"
 
 ## Dockerfile Template (Alpine + uv)
 
-Create `Dockerfile` in project root. Key features:
+Create `docker/Dockerfile`. Key features:
 - **Alpine Linux** base for smaller image size
 - **uv** package manager installed from Alpine repos
 - **su-exec** for dropping privileges
@@ -138,7 +165,7 @@ RUN uv pip install --system --no-cache .
 RUN mkdir -p /data
 
 # Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Set default environment variables
@@ -196,7 +223,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates su-exec tzdata
 
 COPY --from=rust-builder /app/<rust-crate>/target/release/<binary-name> /app/<binary-name>
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 RUN mkdir -p /data
@@ -260,7 +287,7 @@ RUN uv pip install --system --no-cache -r requirements.txt
 COPY <python-package>/ ./<python-package>/
 COPY configs/ ./configs/
 
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 RUN mkdir -p /data
@@ -317,20 +344,21 @@ Key rule: if the builder used `openssl-libs-static`, omit `openssl` from the run
 
 1. **Identify project name** - Use directory name or main package name
 2. **Determine stack** - Python-only, Rust-only, or Python + Rust
-3. **Create build.sh** - Update `IMAGE_NAME` with your registry/project
-4. **Create entrypoint.sh** - Update the `exec` line with your entry point; use `su-exec` for privilege drop
-5. **Choose Dockerfile template** - Python-only, Rust-only, or combined; adjust Rust crate paths, binary name, Python package paths, and port
-6. **Create .dockerignore** - Exclude unnecessary files from build context
-7. **Make scripts executable**:
+3. **Create the `docker/` directory** at the git root
+4. **Create build_docker.sh at the git root** - Update `IMAGE_NAME` with your registry/project; keep the `cd` and the `..` context
+5. **Create docker/entrypoint.sh** - Update the `exec` line with your entry point; use `su-exec` for privilege drop
+6. **Choose Dockerfile template** → `docker/Dockerfile` - Python-only, Rust-only, or combined; adjust Rust crate paths, binary name, Python package paths, and port. All `COPY` paths are relative to the git root
+7. **Create docker/Dockerfile.dockerignore** - Exclude unnecessary files from build context
+8. **Make scripts executable**:
    ```bash
-   chmod +x build.sh entrypoint.sh
+   chmod +x build_docker.sh docker/entrypoint.sh
    ```
 
 ## Running
 
 ```bash
-# Build the image
-./build.sh
+# Build the image (works from any directory)
+./build_docker.sh
 
 # Run with custom user/group/timezone
 docker run -d \
@@ -345,26 +373,38 @@ docker run -d \
 
 ## Docker Compose Example
 
+Create `docker/docker-compose.yml`. Compose resolves relative paths against the
+**compose file's own directory**, so the build context and every volume path must
+step back up to the git root with `..`:
+
 ```yaml
-version: "3.8"
 services:
   app:
     image: <username>/<project-name>:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     environment:
       - PUID=1000
       - PGID=1000
       - UMASK=022
       - TZ=America/New_York
     volumes:
-      - ./data:/data
+      - ../playground/data:/data
     ports:
       - "8000:8000"
     restart: unless-stopped
 ```
 
-## .dockerignore Template
+## Dockerfile.dockerignore Template
 
-Create `.dockerignore` in project root to exclude unnecessary files from the Docker build context:
+Create `docker/Dockerfile.dockerignore` to exclude unnecessary files from the build context.
+
+**The name matters.** Docker resolves `.dockerignore` relative to the build context
+(the git root), so a file named `docker/.dockerignore` would be silently ignored with
+no warning. BuildKit checks `<dockerfile-name>.dockerignore` beside the Dockerfile
+first, so `docker/Dockerfile.dockerignore` is the form that keeps the file in `docker/`
+and actually takes effect. Requires BuildKit (the default in current Docker).
 
 ```
 # Python bytecode
@@ -412,8 +452,7 @@ playground/
 .gitignore
 
 # Docker
-Dockerfile
-.dockerignore
+docker/
 
 # Pre-commit
 .pre-commit-config.yaml

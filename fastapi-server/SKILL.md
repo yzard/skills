@@ -15,24 +15,33 @@ Creates and modifies FastAPI applications following clean architecture:
 - Global exception handling
 - Session-based authentication
 
-## Project Structure
+## Module Layout
+
+The repository layout — `src/backend/`, the mirrored `tests/` tree, `docs/`,
+`playground/`, `docker/` — is owned by the `project-structure` skill. This skill owns
+only what goes *inside* the backend tree:
 
 ```
-entrypoints/
-├── server.py            # Entry point, calls create_application()
-server/
+src/backend/
 ├── __init__.py
+├── main.py              # Entry point, calls create_application()
 ├── app.py               # Application factory
 ├── config.py            # Pydantic config schema
 ├── routes.py            # Main router, includes sub-routers
 ├── auth.py              # Authentication logic
-├── database.py          # Database queries (or database/ module)
+├── database.py          # Database queries (or database/ package)
 ├── exceptions.py        # Custom exceptions and global handler
 ├── middleware.py        # Request logging middleware
 └── module/              # Optional sub-modules
     ├── __init__.py
     └── routes.py        # Sub-module endpoints
 ```
+
+Tests mirror this 1:1 under `tests/backend/` — `tests/backend/test_routes.py`,
+`tests/backend/module/test_routes.py`, and so on.
+
+Section headings below are written `server/config.py`, `server/app.py`, etc. Those are
+package-relative paths inside `src/backend/`.
 
 ## Core Principle: Application Factory Pattern
 

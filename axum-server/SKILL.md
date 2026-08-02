@@ -16,10 +16,14 @@ Creates and modifies Axum (Rust) applications following clean architecture:
 - Session-based authentication
 - Structured logging with request details
 
-## Project Structure
+## Module Layout
+
+The repository layout — `src/backend/`, the mirrored `tests/` tree, `docs/`,
+`playground/`, `docker/` — is owned by the `project-structure` skill. This skill owns
+only what goes *inside* the backend tree:
 
 ```
-src/
+src/backend/
 ├── main.rs              # Entry point, calls create_application()
 ├── app.rs               # Application factory
 ├── config.rs            # Serde config schema
@@ -36,6 +40,13 @@ src/
     ├── mod.rs           # Request/response models
     └── items.rs         # Item models
 ```
+
+Tests mirror this 1:1 under `tests/backend/` — `tests/backend/routes/items.rs`,
+`tests/backend/database/mod.rs`, and so on. Configure the crate so tests live there
+rather than in `#[cfg(test)]` modules beside the source.
+
+Section headings below are written `src/config.rs`, `src/routes/mod.rs`, etc. Those are
+crate-relative paths inside `src/backend/`.
 
 ## Core Principle: Application Factory Pattern
 

@@ -305,7 +305,7 @@ VALUES (?, ?, ?)
 
 **BAD - SQL scattered across files:**
 ```
-src/
+src/backend/
 ├── user_service.py      # Contains CREATE TABLE for users
 ├── order_service.py     # Contains CREATE TABLE for orders
 ├── analytics.py         # Contains inline queries
@@ -316,7 +316,7 @@ src/
 
 **GOOD - SQL centralized:**
 ```
-src/
+src/backend/
 ├── schema.sql           # ALL table and index creation
 ├── queries.py           # ALL query constants
 ├── migrations/

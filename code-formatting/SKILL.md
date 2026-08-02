@@ -14,15 +14,17 @@ Formats Python code using:
 
 ## Before Formatting
 
-**Detect project structure first:**
-
 1. Check for existing config in `pyproject.toml`, `setup.cfg`, or `.isort.cfg`
-2. Identify Python package directories (look for `__init__.py` or `src/` layout)
-3. Find test directories (`tests/`, `test/`)
+2. Format targets are `src/` and `tests/` — the layout owned by the `project-structure` skill
 
 ```bash
-# Find Python packages
-ls -d */ | head -20
+# Confirm the layout before formatting
+ls -d src tests
+```
+
+If a repo predates that layout, detect its directories instead:
+
+```bash
 find . -name "__init__.py" -maxdepth 2
 ```
 
@@ -40,14 +42,11 @@ find . -name "__init__.py" -maxdepth 2
 ### Format entire project
 
 ```bash
-# Detect directories first, then run:
-# Replace <package> and <tests> with actual directory names
-
 # Sort imports first
-isort <package> <tests>
+isort src tests
 
 # Then format with black
-black -C --line-length 120 --skip-string-normalization <package> <tests>
+black -C --line-length 120 --skip-string-normalization src tests
 ```
 
 ### Format a single file

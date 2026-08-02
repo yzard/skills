@@ -10,9 +10,15 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash(isort:*), Bash(black:*)
 
 Refactors Python code following clean code principles:
 - Breaking up long functions
-- Applying guard clauses
-- Proper file organization
-- Consistent patterns across the codebase
+- Proper file organization (public at top, private at bottom)
+- Type annotations and single responsibility
+- Python techniques for parameterizing extracted common logic
+
+The cross-language rules this builds on — guard clauses, no broad try-except, uniform
+patterns, no default arguments, DRY — are owned by the `general-coding` skill. The
+procedure for landing a change (breaking signatures, extracting shared implementations,
+unit tests for touched code) is owned by `add-modify-codebase`. This skill only adds
+what is Python-specific.
 
 ## Key Refactoring Rules
 
@@ -52,18 +58,13 @@ def _select_best(self, candidates: List[Candidate]) -> Optional[Candidate]:
 
 ### 2. Guard Clauses Over Try-Except
 
-**DO NOT use broad try-except blocks.** Use guard clauses with early returns.
+Owned by the `general-coding` skill, Principles 2 and 3 — guard clauses mandatory for
+validation and early exits, no broad try-except.
+
+The Python-specific addition here: each guard raises a **named exception class** and logs
+before raising.
 
 ```python
-# BAD - Swallows errors, unclear failure modes
-def process_file(path: str) -> bool:
-    try:
-        data = read_file(path)
-        return True
-    except Exception as e:
-        return False
-
-# GOOD - Explicit validation, clear error messages
 class InvalidFilePathError(ValueError):
     """Raised when file path is invalid."""
     pass
@@ -117,17 +118,8 @@ def _setup_routes(app: Application) -> None:
 
 ### 4. Consistent Patterns
 
-**When changing a pattern, update ALL similar code.**
-
-- Search for similar implementations using Grep
-- Apply changes consistently across the codebase
-- Don't leave mixed patterns
-
-```bash
-# Find similar patterns before refactoring
-grep -r "def process_" --include="*.py"
-grep -r "try:" --include="*.py" -A 3
-```
+Owned by the `general-coding` skill, Principle 1 — when changing a pattern, update ALL
+similar code and never leave mixed patterns behind.
 
 ### 5. Type Annotations
 
@@ -169,59 +161,12 @@ def send_welcome_email(user: User) -> None:
 
 ### 7. Eliminate Duplication When Adding Features
 
-**When adding new features, ALWAYS search for similar existing code first.**
+Owned by the `general-coding` skill, Principle 6 (the rule) and the `add-modify-codebase`
+skill, Rule 2 (the extract-then-delegate procedure and the duplication threshold).
 
-If similar functionality exists:
-1. Extract the common logic into a shared function
-2. Use parameters to handle differences between use cases
-3. Have both old and new code call the shared function
-
-```python
-# BAD - Adding new feature with duplicated logic
-# Existing code:
-def get_active_users(database: Database) -> List[User]:
-    connection = database.connect()
-    cursor = connection.cursor()
-    cursor.execute("SELECT * FROM users WHERE status = 'active'")
-    rows = cursor.fetchall()
-    users = [User(**row) for row in rows]
-    connection.close()
-    return users
-
-# New feature adds similar code - WRONG!
-def get_premium_users(database: Database) -> List[User]:
-    connection = database.connect()
-    cursor = connection.cursor()
-    cursor.execute("SELECT * FROM users WHERE tier = 'premium'")
-    rows = cursor.fetchall()
-    users = [User(**row) for row in rows]
-    connection.close()
-    return users
-```
-
-```python
-# GOOD - Extract common logic, parameterize differences
-def _fetch_users(database: Database, where_clause: str) -> List[User]:
-    """Internal helper for fetching users with custom filter."""
-    connection = database.connect()
-    cursor = connection.cursor()
-    cursor.execute(f"SELECT * FROM users WHERE {where_clause}")
-    rows = cursor.fetchall()
-    users = [User(**row) for row in rows]
-    connection.close()
-    return users
-
-def get_active_users(database: Database) -> List[User]:
-    return _fetch_users(database, "status = 'active'")
-
-def get_premium_users(database: Database) -> List[User]:
-    return _fetch_users(database, "tier = 'premium'")
-
-def get_users_by_status(database: Database, status: str) -> List[User]:
-    return _fetch_users(database, f"status = '{status}'")
-```
-
-**More complex example with multiple differences:**
+What this skill adds is the Python technique for **parameterizing the differences** once
+they exceed a simple value — pass a `Callable` for the varying step rather than branching
+inside the shared function:
 
 ```python
 # BAD - Two functions with 80% similar code
@@ -280,29 +225,12 @@ def generate_quarterly_report(data: ReportData) -> Report:
     )
 ```
 
-**Before adding any new feature:**
-
-```bash
-# Search for similar patterns in the codebase
-grep -rn "similar_keyword" --include="*.py"
-grep -rn "def.*similar_function" --include="*.py"
-
-# Look for duplicated logic
-grep -rn "repeated_code_pattern" --include="*.py" -A 5
-```
-
-**Signs you need to refactor:**
-- Copy-pasting existing code to modify slightly
-- Two functions that differ only in 1-2 lines
-- Same sequence of operations in multiple places
-- Similar error handling repeated across functions
-
 ## Refactoring Checklist
 
 Before finishing refactoring:
 
 1. [ ] No function exceeds ~100 lines
-2. [ ] Guard clauses used instead of broad try-except
+2. [ ] Guard clauses used for validation and early exits unless they would make the code harder to follow
 3. [ ] Public functions at top, private at bottom
 4. [ ] All functions have type annotations
 5. [ ] Similar patterns updated consistently
@@ -313,10 +241,10 @@ Before finishing refactoring:
 
 ## Post-Refactoring
 
-**ALWAYS run formatters after refactoring:**
+**ALWAYS run formatters after refactoring** — commands and settings are owned by the
+`code-formatting` skill:
 
 ```bash
-# Detect package directories first, then:
-isort <package> <tests>
-black -C --line-length 120 --skip-string-normalization <package> <tests>
+isort src tests
+black -C --line-length 120 --skip-string-normalization src tests
 ```
