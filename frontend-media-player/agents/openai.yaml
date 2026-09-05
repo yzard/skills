@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Media Player"
+  short_description: "Build reliable native video playback and previews."
+  default_prompt: "Implement or improve the frontend media player using native controls, safe media lifecycles, accessible behavior, and focused tests."
