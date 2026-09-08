@@ -1,37 +1,18 @@
 ---
 name: restful-api-design
-description: RESTful API path and method conventions across all languages. Use when defining or reviewing API routes, endpoint structure, or HTTP method choices to align paths with product components and standardize on POST usage with limited GET exceptions.
+description: Define or review action-style API routes, HTTP methods, and protocol exceptions.
 ---
 
-# Restful API Design
+# API route conventions
 
-## Overview
+This is an action-style project convention, not a claim that REST requires POST for reads.
+Repository-defined contracts take precedence.
 
-Define RESTful API paths and HTTP methods with consistent, product-component-focused routing and a POST-first convention.
-
-## Guidelines
-
-### Path Structure
-
-- Keep path nouns aligned to product component notions (photos, movies, tags, etc.).
-- Use the pattern `/api/v1/<notion>/<operation>` for endpoint routes.
-
-### HTTP Method
-
-- Use `POST` for RESTful API endpoints by default.
-- Use `GET` only for conventions like streaming video to the frontend or serving static assets.
-
-## Examples
-
-```text
-/api/v1/photo/get
-/api/v1/photo/delete
-/api/v1/photo/add
-/api/v1/tags/add
-```
-
-## Checklist
-
-- [ ] Path uses product component notions for `<notion>`
-- [ ] Route follows `/api/v1/<notion>/<operation>`
-- [ ] Endpoint uses `POST` unless streaming media or serving static assets
+- Use `/api/v1/<component>/<operation>` with domain names matching existing components.
+- Use POST for normal application operations, including queries under this convention.
+- Preserve GET for media/static delivery and protocol handshakes, and protocol-specific
+  methods such as WebDAV PUT/PATCH. Do not rewrite unrelated endpoints during a scoped task.
+- Define validation, error status, retry/idempotency behavior, and access checks for the
+  changed contract; update affected handlers, clients, docs, and tests together.
+- Queries remain side-effect-free even with POST. The HTTP method does not select a database
+  execution lane or replace authentication. Never put credentials in query strings.
