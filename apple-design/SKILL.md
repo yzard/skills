@@ -5,6 +5,14 @@ description: Apple's approach to interface design and fluid, physical motion, tr
 
 # Apple Design
 
+## Client navigation and editing
+
+For client application tabs and editors, keep the original view state and open editors as overlays.
+Do not reload the original view on tab return or editor close.
+Follow the [client navigation and editing contract](../add-modify-codebase/references/client-navigation.md) when this work affects those flows.
+Apply it to designs, implementation, reviews, or changed-client release checks within this skill's existing scope.
+
+
 How Apple builds interfaces that stop feeling like a computer and start feeling like an extension of you. This knowledge comes from Apple's WWDC design talks — chiefly *Designing Fluid Interfaces* (WWDC 2018) — distilled and translated into the web platform (CSS, Pointer Events, `requestAnimationFrame`, spring libraries like Motion/Framer Motion).
 
 The through-line: **an interface feels alive when motion starts from the current on-screen value, inherits the user's velocity, projects momentum forward, and can be grabbed and reversed at any instant.** Springs are the tool that makes all of this natural, because they are inherently interruptible and velocity-aware.

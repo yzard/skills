@@ -6,15 +6,28 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash(cargo:*)
 
 # Axum services
 
-Use JWT authentication and TOML configuration. Keep construction in an application factory,
-startup in `main.rs`, and dependencies in typed application state. Follow the crate's installed
-Axum version and repository-owned execution model rather than copying a server template.
+All background-service credentials are embedded in the owning service's `config.toml`;
+follow [the shared credential constraint](../general-coding/SKILL.md#background-service-credentials).
+Do not add credential files, Docker secret mounts, or environment/CLI key/password overrides.
 
-- Parse the required CLI config path into typed TOML settings and validate ranges and
-  cross-field constraints. Missing/malformed required config fails startup. Use the existing
+
+Preserve the repository's authentication and TOML contracts. Keep construction in an application
+factory, startup in `main.rs`, and dependencies in typed application state. Follow the crate's
+installed Axum version and execution model rather than copying a server template.
+
+For Receipt Master `backend_api`, preserve its separate Bearer client and OCR service API
+keys. Require `--data-dir ABSOLUTE_DIRECTORY`, read only `<data-dir>/config.toml`, and keep
+the data root out of TOML. API `[ocr]` has only `url` and `api_key`; model settings belong
+to `backend_ocr`, prompts to API's `prompt.toml`. Allow `BACKEND_OCR_URL` to override the noncredential URL at startup; the OCR
+API key comes exclusively from TOML. Validate the effective settings. Do not restore `[logos].enabled`, pricing,
+or budget settings. The complete service-boundary and layout rules are in
+[Receipt Master data and configuration](../docker-build/references/receipt-master-config.md).
+
+- Parse the repository's required CLI configuration input into typed TOML settings and validate
+  ranges and cross-field constraints. Missing/malformed required config fails startup. Use the existing
   config manager for live snapshots; do not retain stale copies or introduce YAML config.
-- Authenticate user API requests with `Authorization: Bearer <JWT>`, through the shared
-  authentication extractor. Do not introduce an in-memory session-token map or `X-Auth-Token`.
+- For JWT-based services, authenticate user API requests with `Authorization: Bearer <JWT>`
+  through the shared authentication extractor. Do not introduce an in-memory session-token map or `X-Auth-Token`.
   Preserve deliberately separate login, service API-key, WebDAV, and WebSocket contracts.
 - Handlers extract typed input, enforce resource access, and call business operations.
   Keep body-consuming extractors last and preserve streaming/backpressure.

@@ -5,6 +5,14 @@ description: Survey a codebase's animation and motion code as a senior motion ad
 
 # Improving Animations
 
+## Client navigation and editing
+
+For client application tabs and editors, keep the original view state and open editors as overlays.
+Do not reload the original view on tab return or editor close.
+Follow the [client navigation and editing contract](../add-modify-codebase/references/client-navigation.md) when this work affects those flows.
+Apply it to designs, implementation, reviews, or changed-client release checks within this skill's existing scope.
+
+
 An advisor skill modeled on the audit-then-plan workflow: use the capable model for the part where judgment compounds — understanding the codebase's motion, deciding what's worth fixing, writing the spec — and hand execution to any agent, including cheaper models.
 
 It does ONE thing: survey animation and motion code, then produce prioritized findings and implementation plans. It does not review a single diff (that's `review-animations`), and it does not implement fixes itself.

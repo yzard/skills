@@ -6,6 +6,14 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash
 
 # Changing an existing codebase
 
+## Client navigation and editing
+
+For client application tabs and editors, keep the original view state and open editors as overlays.
+Do not reload the original view on tab return or editor close.
+Follow the [client navigation and editing contract](references/client-navigation.md) when this work affects those flows.
+Apply it to designs, implementation, reviews, or changed-client release checks within this skill's existing scope.
+
+
 Use the repository's contracts and the user's requested outcome. This skill governs behavior
 and contract changes; it does not require a full workflow for documentation or formatting edits.
 

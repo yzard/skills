@@ -5,6 +5,14 @@ description: Build animations in React Native and Expo, making the decisions in 
 
 # Building Animations in Expo
 
+## Client navigation and editing
+
+For client application tabs and editors, keep the original view state and open editors as overlays.
+Do not reload the original view on tab return or editor close.
+Follow the [client navigation and editing contract](../add-modify-codebase/references/client-navigation.md) when this work affects those flows.
+Apply it to designs, implementation, reviews, or changed-client release checks within this skill's existing scope.
+
+
 A construction skill for React Native. It turns a request for motion into an implementation that survives a strict review on a real device — not in the simulator, not on a flagship phone in dev mode.
 
 Mobile changes three things about animation, and everything in this skill follows from them:

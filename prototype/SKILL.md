@@ -6,6 +6,14 @@ disable-model-invocation: true
 
 # Prototyping Variants
 
+## Client navigation and editing
+
+For client application tabs and editors, keep the original view state and open editors as overlays.
+Do not reload the original view on tab return or editor close.
+Follow the [client navigation and editing contract](../add-modify-codebase/references/client-navigation.md) when this work affects those flows.
+Apply it to designs, implementation, reviews, or changed-client release checks within this skill's existing scope.
+
+
 A divergence skill. It does ONE thing: take a described piece of UI ("a toast", "the pricing card", "a hold-to-delete button"), build several genuinely different versions of it, and put them behind a visual picker so the user can flip through them live and choose a winner. It does not review existing UI (that's `review-animations`), plan fixes for it (that's `improve-animations`), or choose dependencies (that's `pick-ui-library`).
 
 ## Operating Posture

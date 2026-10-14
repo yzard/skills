@@ -6,6 +6,14 @@ allowed-tools: Read, Edit, Write, Glob, Grep
 
 # General coding
 
+## Client navigation and editing
+
+For client application tabs and editors, keep the original view state and open editors as overlays.
+Do not reload the original view on tab return or editor close.
+Follow the [client navigation and editing contract](../add-modify-codebase/references/client-navigation.md) when this work affects those flows.
+Apply it to designs, implementation, reviews, or changed-client release checks within this skill's existing scope.
+
+
 Repository contracts and explicit user choices override shared preferences. Apply conventions
 to the affected implementation and callers, including any repository-required layout migration.
 
@@ -23,9 +31,27 @@ to the affected implementation and callers, including any repository-required la
   composition for real differences. Update affected callers to one coherent implementation.
 - Parse CLI/config at the application boundary and pass typed configuration explicitly.
   Use flags for a small new executable or a config file for structured settings; preserve the
-  project's chosen format. Axum services use TOML. Do not create a second configuration path.
+  project's chosen format for tools; background services use `config.toml`. Do not create a second configuration path.
 - Do not add environment reads inside business code. Container entrypoints may translate
-  environment inputs; preserve documented config-loader exceptions.
+  noncredential environment inputs; background-service credentials come only from TOML.
+
+## Background service credentials
+
+For every background service, including API and OCR services, store all configured API keys,
+tokens, signing secrets and passwords as embedded values in that service's `config.toml`.
+Do not use separate secret/key/password files, `*_file` credential settings, Docker secrets,
+or environment/CLI credential overrides as a second source. Load and validate the TOML at
+the service boundary and pass typed settings explicitly. Preserve the repository's data-root
+and startup CLI conventions. Templates contain empty placeholders, never real credentials;
+secret-bearing operator TOMLs are owner-readable only and excluded from Git, image build
+contexts, client payloads, logs and ordinary business-data exports.
+
+When converting an existing credential-file setup, preserve key values and operator settings,
+validate the complete replacement, persist it atomically, and remove project-owned obsolete
+files only after the TOMLs are durable. Stop affected services before replacing live
+configuration/layout. User-account password hashes and issued-session records remain business
+data in their established stores; build/signing artifacts and platform-managed certificates
+are outside this background-service configuration rule.
 
 Contract-change and regression workflow is in `add-modify-codebase`; placement is in repository
 instructions and `project-structure`. Consult them when those decisions arise, not on every edit.

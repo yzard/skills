@@ -6,11 +6,25 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash(isort:*), Bash(black:*)
 
 # FastAPI Server Development
 
+All background-service credentials are embedded in the owning service's `config.toml`;
+follow [the shared credential constraint](../general-coding/SKILL.md#background-service-credentials).
+Do not add credential files, Docker secret mounts, or environment/CLI key/password overrides.
+
+
+For Receipt Master `backend_ocr`, the project contract overrides the generic YAML examples
+below: require `--data-dir ABSOLUTE_DIRECTORY`, load only `<data-dir>/config.toml` as TOML,
+keep model and inference settings in this OCR config, and keep API receipt prompts out of
+the OCR directory. Preserve the separate OCR service key embedded in this TOML. See
+[Receipt Master data and configuration](../docker-build/references/receipt-master-config.md).
+
+Background services use TOML regardless of framework. Any YAML configuration examples
+below are legacy illustrations; adapt their settings to the required service `config.toml`.
+
 ## What This Skill Does
 
 Creates and modifies FastAPI applications following clean architecture:
 - Application factory pattern (no module-level app)
-- YAML config with Pydantic validation
+- TOML config with Pydantic validation
 - Centralized routes and database modules
 - Global exception handling
 - Session-based authentication
