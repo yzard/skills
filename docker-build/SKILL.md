@@ -40,6 +40,13 @@ runtime/deployment contracts; a generic template is not a reason to replace them
 
 ## Android APK builds
 
+- Use Release configuration for every Android app build, installation, deployment,
+  emulator/device check, and performance measurement. Use the toolchain's Release
+  export and native compilation settings, Release Gradle assembly/lint/test tasks,
+  and the resulting Release APK throughout the workflow. Configure the tested build
+  type as Release when the Android Gradle plugin otherwise creates only Debug tests.
+  Validate that the final APK is non-debuggable before exporting or installing it.
+  Preserve the existing signing identity when changing build configuration.
 - Build Android APKs inside Docker. A repository `build_android.sh` orchestrates the
   container build and artifact export; it must not compile with host Flutter, Java, or
   Android SDK installations. This rule does not apply to iOS/Xcode builds.
